@@ -9,5 +9,6 @@ export interface SmartModel {
     temp: number;
     power_on_hours: number;
     power_cycle_count: number
+    health_estimate?: number
     attrs: { [key: string]: SmartAttributeModel }
 }

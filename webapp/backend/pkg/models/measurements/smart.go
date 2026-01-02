@@ -2,13 +2,15 @@ package measurements
 
 import (
 	"fmt"
-	"github.com/analogj/scrutiny/webapp/backend/pkg"
-	"github.com/analogj/scrutiny/webapp/backend/pkg/models/collector"
-	"github.com/analogj/scrutiny/webapp/backend/pkg/thresholds"
 	"log"
+	"math"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/analogj/scrutiny/webapp/backend/pkg"
+	"github.com/analogj/scrutiny/webapp/backend/pkg/models/collector"
+	"github.com/analogj/scrutiny/webapp/backend/pkg/thresholds"
 )
 
 type Smart struct {
@@ -25,7 +27,8 @@ type Smart struct {
 	Attributes map[string]SmartAttribute `json:"attrs"`
 
 	//status
-	Status pkg.DeviceStatus
+	Status         pkg.DeviceStatus
+	HealthEstimate float64 `json:"health_estimate,omitempty"`
 }
 
 func (sm *Smart) Flatten() (tags map[string]string, fields map[string]interface{}) {
@@ -38,6 +41,7 @@ func (sm *Smart) Flatten() (tags map[string]string, fields map[string]interface{
 		"temp":              sm.Temp,
 		"power_on_hours":    sm.PowerOnHours,
 		"power_cycle_count": sm.PowerCycleCount,
+		"health_estimate":   sm.HealthEstimate,
 	}
 
 	for _, attr := range sm.Attributes {
@@ -69,6 +73,8 @@ func NewSmartFromInfluxDB(attrs map[string]interface{}) (*Smart, error) {
 			sm.PowerOnHours = val.(int64)
 		case "power_cycle_count":
 			sm.PowerCycleCount = val.(int64)
+		case "health_estimate":
+			sm.HealthEstimate = val.(float64)
 		default:
 			// this key is unknown.
 			if !strings.HasPrefix(key, "attr.") {
@@ -96,11 +102,12 @@ func NewSmartFromInfluxDB(attrs map[string]interface{}) (*Smart, error) {
 	}
 
 	log.Printf("Found Smart Device (%s) Attributes (%v)", sm.DeviceWWN, len(sm.Attributes))
+	sm.CalculateHealthEstimate()
 
 	return &sm, nil
 }
 
-//Parse Collector SMART data results and create Smart object (and associated SmartAtaAttribute entries)
+// Parse Collector SMART data results and create Smart object (and associated SmartAtaAttribute entries)
 func (sm *Smart) FromCollectorSmartInfo(wwn string, info collector.SmartInfo) error {
 	sm.DeviceWWN = wwn
 	sm.Date = time.Unix(info.LocalTime.TimeT, 0)
@@ -124,10 +131,11 @@ func (sm *Smart) FromCollectorSmartInfo(wwn string, info collector.SmartInfo) er
 		sm.ProcessScsiSmartInfo(info.ScsiGrownDefectList, info.ScsiErrorCounterLog)
 	}
 
+	sm.CalculateHealthEstimate()
 	return nil
 }
 
-//generate SmartAtaAttribute entries from Scrutiny Collector Smart data.
+// generate SmartAtaAttribute entries from Scrutiny Collector Smart data.
 func (sm *Smart) ProcessAtaSmartInfo(tableItems []collector.AtaSmartAttributesTableItem) {
 	for _, collectorAttr := range tableItems {
 		attrModel := SmartAtaAttribute{
@@ -155,7 +163,7 @@ func (sm *Smart) ProcessAtaSmartInfo(tableItems []collector.AtaSmartAttributesTa
 	}
 }
 
-//generate SmartNvmeAttribute entries from Scrutiny Collector Smart data.
+// generate SmartNvmeAttribute entries from Scrutiny Collector Smart data.
 func (sm *Smart) ProcessNvmeSmartInfo(nvmeSmartHealthInformationLog collector.NvmeSmartHealthInformationLog) {
 
 	sm.Attributes = map[string]SmartAttribute{
@@ -185,7 +193,133 @@ func (sm *Smart) ProcessNvmeSmartInfo(nvmeSmartHealthInformationLog collector.Nv
 	}
 }
 
-//generate SmartScsiAttribute entries from Scrutiny Collector Smart data.
+// CalculateHealthEstimate computes a disk health estimate based on SMART attributes.
+// The estimate is stored on the Smart struct and returned as a percentage between 0-100.
+func (sm *Smart) CalculateHealthEstimate() float64 {
+	if len(sm.Attributes) == 0 {
+		sm.HealthEstimate = 100
+		return sm.HealthEstimate
+	}
+
+	totalHealth := 0.0
+	for _, attr := range sm.Attributes {
+		risk := sm.attributeRisk(attr)
+		totalHealth += 1 - risk
+	}
+
+	sm.HealthEstimate = clamp01(totalHealth/float64(len(sm.Attributes))) * 100
+	return sm.HealthEstimate
+}
+
+func (sm *Smart) attributeRisk(attr SmartAttribute) float64 {
+	switch v := attr.(type) {
+	case *SmartAtaAttribute:
+		return sm.ataAttributeRisk(v)
+	case *SmartNvmeAttribute:
+		return sm.nvmeAttributeRisk(v)
+	case *SmartScsiAttribute:
+		return sm.scsiAttributeRisk(v)
+	default:
+		return 0
+	}
+}
+
+func (sm *Smart) ataAttributeRisk(attr *SmartAtaAttribute) float64 {
+	risk := attr.FailureRate
+
+	if pkg.AttributeStatusHas(attr.Status, pkg.AttributeStatusFailedSmart|pkg.AttributeStatusFailedScrutiny) {
+		risk = 1
+	} else if pkg.AttributeStatusHas(attr.Status, pkg.AttributeStatusWarningScrutiny) && risk < 0.5 {
+		risk = 0.5
+	}
+
+	if smartMetadata, ok := thresholds.AtaMetadata[attr.AttributeId]; ok {
+		var value int64
+		if smartMetadata.DisplayType == thresholds.AtaSmartAttributeDisplayTypeNormalized {
+			value = int64(attr.Value)
+		} else if smartMetadata.DisplayType == thresholds.AtaSmartAttributeDisplayTypeTransformed && attr.TransformedValue != 0 {
+			value = attr.TransformedValue
+		} else {
+			value = attr.RawValue
+		}
+
+		proximity := proximityScore(value, attr.Threshold, smartMetadata.Ideal)
+		if proximity > risk {
+			risk = proximity
+		}
+	}
+
+	return clamp01(risk)
+}
+
+func (sm *Smart) nvmeAttributeRisk(attr *SmartNvmeAttribute) float64 {
+	risk := attr.FailureRate
+
+	if pkg.AttributeStatusHas(attr.Status, pkg.AttributeStatusFailedSmart|pkg.AttributeStatusFailedScrutiny) {
+		risk = 1
+	} else if pkg.AttributeStatusHas(attr.Status, pkg.AttributeStatusWarningScrutiny) && risk < 0.5 {
+		risk = 0.5
+	}
+
+	if smartMetadata, ok := thresholds.NmveMetadata[attr.AttributeId]; ok {
+		proximity := proximityScore(attr.Value, attr.Threshold, smartMetadata.Ideal)
+		if proximity > risk {
+			risk = proximity
+		}
+	}
+
+	return clamp01(risk)
+}
+
+func (sm *Smart) scsiAttributeRisk(attr *SmartScsiAttribute) float64 {
+	risk := attr.FailureRate
+
+	if pkg.AttributeStatusHas(attr.Status, pkg.AttributeStatusFailedSmart|pkg.AttributeStatusFailedScrutiny) {
+		risk = 1
+	} else if pkg.AttributeStatusHas(attr.Status, pkg.AttributeStatusWarningScrutiny) && risk < 0.5 {
+		risk = 0.5
+	}
+
+	if smartMetadata, ok := thresholds.ScsiMetadata[attr.AttributeId]; ok {
+		proximity := proximityScore(attr.Value, attr.Threshold, smartMetadata.Ideal)
+		if proximity > risk {
+			risk = proximity
+		}
+	}
+
+	return clamp01(risk)
+}
+
+func proximityScore(value, threshold int64, ideal string) float64 {
+	if threshold <= 0 {
+		return 0
+	}
+
+	v := math.Abs(float64(value))
+	t := math.Abs(float64(threshold))
+
+	switch ideal {
+	case thresholds.ObservedThresholdIdealLow:
+		return clamp01(v / (v + t))
+	default:
+		if v == 0 {
+			return 1
+		}
+		return clamp01(t / (v + t))
+	}
+}
+
+func clamp01(val float64) float64 {
+	if val < 0 {
+		return 0
+	}
+	if val > 1 {
+		return 1
+	}
+	return val
+}
+
+// generate SmartScsiAttribute entries from Scrutiny Collector Smart data.
 func (sm *Smart) ProcessScsiSmartInfo(defectGrownList int64, scsiErrorCounterLog collector.ScsiErrorCounterLog) {
 	sm.Attributes = map[string]SmartAttribute{
 		"scsi_grown_defect_list":                     (&SmartScsiAttribute{AttributeId: "scsi_grown_defect_list", Value: defectGrownList, Threshold: 0}).PopulateAttributeStatus(),
