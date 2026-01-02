@@ -298,11 +298,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
             return;
         }
 
-        const data = JSON.stringify(this.summaryData, null, 2);
-        this.downloadJsonFile(data, 'scrutiny-dashboard-summary.json');
+        this.downloadJsonFile(this.summaryData, 'scrutiny-dashboard-summary.json');
     }
 
-    private downloadJsonFile(content: string, fileName: string): void {
+    private downloadJsonFile(data: any, fileName: string): void {
+        const content = JSON.stringify(data, null, 2);
         const blob = new Blob([content], {type: 'application/json'});
         const url = window.URL.createObjectURL(blob);
         const anchor = document.createElement('a');
