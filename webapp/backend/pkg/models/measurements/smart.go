@@ -268,6 +268,12 @@ func (sm *Smart) ataAttributeRisk(attr *SmartAtaAttribute) float64 {
 			value = attr.RawValue
 		}
 
+		if risk == 0 {
+			if observedRate := observedFailureRate(smartMetadata, value); observedRate > 0 {
+				risk = observedRate
+			}
+		}
+
 		proximity := proximityScore(value, attr.Threshold, smartMetadata.Ideal)
 		if proximity > risk {
 			risk = proximity
@@ -342,6 +348,16 @@ func clamp01(val float64) float64 {
 		return 1
 	}
 	return val
+}
+
+func observedFailureRate(metadata thresholds.AtaAttributeMetadata, value int64) float64 {
+	for _, obsThresh := range metadata.ObservedThresholds {
+		if ((obsThresh.Low == obsThresh.High) && value == obsThresh.Low) ||
+			(obsThresh.Low < value && value <= obsThresh.High) {
+			return obsThresh.AnnualFailureRate
+		}
+	}
+	return 0
 }
 
 // generate SmartScsiAttribute entries from Scrutiny Collector Smart data.
