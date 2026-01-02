@@ -18,7 +18,7 @@
                                   [svgIcon]="'archive'"></mat-icon>
                                 <span class="ml-2">Archived</span>
                     </button>
-                    <button matTooltip="not yet implemented" class="ml-2 xs:hidden" mat-stroked-button>
+                    <button class="ml-2 xs:hidden" mat-stroked-button (click)="exportSummary()">
                         <mat-icon class="icon-size-20"
                                   [svgIcon]="'save'"></mat-icon>
                         <span class="ml-2">Export</span>
@@ -45,7 +45,7 @@
                                 <span class="ml-2">Archived</span>
                             </button>
                             <button mat-menu-item
-                                    matTooltip="not yet implemented">
+                                    (click)="exportSummary()">
                                 <mat-icon class="icon-size-20"
                                           [svgIcon]="'save'"></mat-icon>
                                 <span class="ml-2">Export</span>

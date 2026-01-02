@@ -293,6 +293,25 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
             });
     }
 
+    exportSummary(): void {
+        if (!this.summaryData) {
+            return;
+        }
+
+        const data = JSON.stringify(this.summaryData, null, 2);
+        this.downloadJsonFile(data, 'scrutiny-dashboard-summary.json');
+    }
+
+    private downloadJsonFile(content: string, fileName: string): void {
+        const blob = new Blob([content], {type: 'application/json'});
+        const url = window.URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = fileName;
+        anchor.click();
+        window.URL.revokeObjectURL(url);
+    }
+
     /**
      * Track by function for ngFor loops
      *

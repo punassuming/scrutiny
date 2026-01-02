@@ -439,6 +439,32 @@ export class DetailComponent implements OnInit, AfterViewInit, OnDestroy {
         this.smartAttributeDataSource.data = this._generateSmartAttributeTableDataSource(this.smart_results);
     }
 
+    exportDetails(): void {
+        if (!this.device || !this.smart_results) {
+            return;
+        }
+
+        const exportPayload = {
+            device: this.device,
+            smart_results: this.smart_results,
+            metadata: this.metadata
+        };
+
+        const fileName = `scrutiny-device-${this.device.wwn || 'export'}.json`;
+        this.downloadJsonFile(exportPayload, fileName);
+    }
+
+    private downloadJsonFile(data: any, fileName: string): void {
+        const jsonContent = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonContent], {type: 'application/json'});
+        const url = window.URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = fileName;
+        anchor.click();
+        window.URL.revokeObjectURL(url);
+    }
+
     openDialog(): void {
         const dialogRef = this.dialog.open(DetailSettingsComponent);
 
