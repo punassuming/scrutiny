@@ -17,6 +17,7 @@ import {SmartModel} from 'app/core/models/measurements/smart-model';
 import {SmartAttributeModel} from 'app/core/models/measurements/smart-attribute-model';
 import {AttributeMetadataModel} from 'app/core/models/thresholds/attribute-metadata-model';
 import {DeviceStatusPipe} from 'app/shared/device-status.pipe';
+import {downloadJson, sanitizeFilenamePart} from 'app/shared/download-json.util';
 
 // from Constants.go - these must match
 const AttributeStatusPassed = 0
@@ -437,6 +438,23 @@ export class DetailComponent implements OnInit, AfterViewInit, OnDestroy {
     toggleOnlyCritical(): void {
         this.onlyCritical = !this.onlyCritical
         this.smartAttributeDataSource.data = this._generateSmartAttributeTableDataSource(this.smart_results);
+    }
+
+    exportDetails(): void {
+        if (!this.device || !this.smart_results) {
+            return;
+        }
+
+        const exportPayload = {
+            device: this.device,
+            smart_results: this.smart_results,
+            metadata: this.metadata
+        };
+
+        const fallbackId = this.device.wwn || this.device.serial_number || `device-${Date.now()}`;
+        const safeId = sanitizeFilenamePart(String(fallbackId));
+        const fileName = `scrutiny-device-${safeId}.json`;
+        downloadJson(exportPayload, fileName);
     }
 
     openDialog(): void {

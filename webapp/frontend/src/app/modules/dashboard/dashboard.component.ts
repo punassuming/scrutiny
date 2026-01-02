@@ -19,6 +19,7 @@ import {Router} from '@angular/router';
 import {TemperaturePipe} from 'app/shared/temperature.pipe';
 import {DeviceTitlePipe} from 'app/shared/device-title.pipe';
 import {DeviceSummaryModel} from 'app/core/models/device-summary-model';
+import {downloadJson} from 'app/shared/download-json.util';
 
 @Component({
     selector       : 'example',
@@ -291,6 +292,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
                 // Prepare the chart series data
                 this.tempChart.updateSeries(this._deviceDataTemperatureSeries())
             });
+    }
+
+    exportSummary(): void {
+        if (!this.summaryData) {
+            return;
+        }
+
+        downloadJson(this.summaryData, 'scrutiny-dashboard-summary.json');
     }
 
     /**
