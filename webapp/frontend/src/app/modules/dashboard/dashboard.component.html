@@ -77,13 +77,13 @@
 
 
             <!-- Drive Temperatures -->
-            <div class="flex flex-auto w-full min-w-80 h-90 p-4">
+            <div class="flex flex-auto w-full min-w-80 h-90 p-4" *ngFor="let protocol of getProtocolKeys()">
                 <div class="flex flex-col flex-auto bg-card shadow-md rounded overflow-hidden">
                     <div class="flex flex-col p-6 pr-4 pb-4">
                         <div class="flex items-center justify-between">
                             <div class="flex flex-col">
-                                <div class="font-bold text-md text-secondary uppercase tracking-wider mr-4">Temperature</div>
-                                <div class="text-sm text-hint font-medium">Temperature history for each device</div>
+                                <div class="font-bold text-md text-secondary uppercase tracking-wider mr-4">Temperature - {{ protocol }}</div>
+                                <div class="text-sm text-hint font-medium">Temperature history for {{ protocol }} devices</div>
                             </div>
                             <div>
                                 <button class="h-8 min-h-8 px-2"
@@ -102,14 +102,14 @@
 
                     </div>
                     <div class="flex flex-col flex-auto">
-                        <apx-chart #tempChart *ngIf="temperatureOptions" class="flex-auto w-full h-full"
-                                   [chart]="temperatureOptions.chart"
-                                   [colors]="temperatureOptions.colors"
-                                   [fill]="temperatureOptions.fill"
-                                   [series]="temperatureOptions.series"
-                                   [stroke]="temperatureOptions.stroke"
-                                   [tooltip]="temperatureOptions.tooltip"
-                                   [xaxis]="temperatureOptions.xaxis"></apx-chart>
+                        <apx-chart *ngIf="temperatureOptionsByProtocol[protocol]" class="flex-auto w-full h-full"
+                                   [chart]="temperatureOptionsByProtocol[protocol].chart"
+                                   [colors]="temperatureOptionsByProtocol[protocol].colors"
+                                   [fill]="temperatureOptionsByProtocol[protocol].fill"
+                                   [series]="temperatureOptionsByProtocol[protocol].series"
+                                   [stroke]="temperatureOptionsByProtocol[protocol].stroke"
+                                   [tooltip]="temperatureOptionsByProtocol[protocol].tooltip"
+                                   [xaxis]="temperatureOptionsByProtocol[protocol].xaxis"></apx-chart>
                     </div>
                 </div>
             </div>

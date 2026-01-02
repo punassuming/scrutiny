@@ -32,7 +32,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
 {
     summaryData: { [key: string]: DeviceSummaryModel };
     hostGroups: { [hostId: string]: string[] } = {}
-    temperatureOptions: ApexOptions;
+    temperatureOptionsByProtocol: { [protocol: string]: ApexOptions } = {};
     tempDurationKey = 'forever'
     config: AppConfig;
     showArchived: boolean;
@@ -141,8 +141,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
         this.router.navigate([currentUrl]);
     }
 
-    private _deviceDataTemperatureSeries(): any[] {
-        const deviceTemperatureSeries = []
+    private _deviceDataTemperatureSeriesByProtocol(): { [protocol: string]: any[] } {
+        const temperatureSeriesByProtocol: { [protocol: string]: any[] } = {}
 
         console.log('DEVICE DATA SUMMARY', this.summaryData)
 
@@ -150,6 +150,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
             const deviceSummary = this.summaryData[wwn]
             if (!deviceSummary.temp_history) {
                 continue
+            }
+
+            const deviceProtocol = deviceSummary.device.device_protocol || 'Unknown'
+            
+            if (!temperatureSeriesByProtocol[deviceProtocol]) {
+                temperatureSeriesByProtocol[deviceProtocol] = []
             }
 
             const deviceName = DeviceTitlePipe.deviceTitleWithFallback(deviceSummary.device, this.config.dashboard_display)
@@ -175,9 +181,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
                     y: temperature
                 })
             }
-            deviceTemperatureSeries.push(deviceSeriesMetadata)
+            temperatureSeriesByProtocol[deviceProtocol].push(deviceSeriesMetadata)
         }
-        return deviceTemperatureSeries
+        return temperatureSeriesByProtocol
     }
     /**
      * Prepare the chart data from the data
@@ -186,58 +192,67 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
      */
     private _prepareChartData(): void
     {
-        // Account balance
-        this.temperatureOptions = {
-            chart  : {
-                animations: {
-                    speed           : 400,
-                    animateGradually: {
-                        enabled: false
-                    }
-                },
-                fontFamily: 'inherit',
-                foreColor : 'inherit',
-                width     : '100%',
-                height    : '100%',
-                type      : 'area',
-                sparkline : {
-                    enabled: true
-                }
-            },
-            colors : ['#667eea', '#9066ea', '#66c0ea', '#66ead2', '#d266ea', '#66ea90'],
-            fill   : {
-                colors : ['#b2bef4', '#c7b2f4', '#b2dff4', '#b2f4e8', '#e8b2f4', '#b2f4c7'],
-                opacity: 0.5,
-                type   : 'gradient'
-            },
-            series : this._deviceDataTemperatureSeries(),
-            stroke : {
-                curve: this.config.line_stroke,
-                width: 2
-            },
-            tooltip: {
-                theme: 'dark',
-                shared: true,
-                intersect: false,
-                x    : {
-                    format: 'MMM dd, yyyy HH:mm:ss'
-                },
-                y    : {
+        const seriesByProtocol = this._deviceDataTemperatureSeriesByProtocol()
+        this.temperatureOptionsByProtocol = {}
 
-                    formatter: (value) => {
-                        return TemperaturePipe.formatTemperature(value, this.config.temperature_unit, true) as string;
+        for (const protocol in seriesByProtocol) {
+            // Account balance
+            this.temperatureOptionsByProtocol[protocol] = {
+                chart  : {
+                    animations: {
+                        speed           : 400,
+                        animateGradually: {
+                            enabled: false
+                        }
+                    },
+                    fontFamily: 'inherit',
+                    foreColor : 'inherit',
+                    width     : '100%',
+                    height    : '100%',
+                    type      : 'area',
+                    sparkline : {
+                        enabled: true
                     }
+                },
+                colors : ['#667eea', '#9066ea', '#66c0ea', '#66ead2', '#d266ea', '#66ea90'],
+                fill   : {
+                    colors : ['#b2bef4', '#c7b2f4', '#b2dff4', '#b2f4e8', '#e8b2f4', '#b2f4c7'],
+                    opacity: 0.5,
+                    type   : 'gradient'
+                },
+                series : seriesByProtocol[protocol],
+                stroke : {
+                    curve: this.config.line_stroke,
+                    width: 2
+                },
+                tooltip: {
+                    theme: 'dark',
+                    shared: true,
+                    intersect: false,
+                    x    : {
+                        format: 'MMM dd, yyyy HH:mm:ss'
+                    },
+                    y    : {
+
+                        formatter: (value) => {
+                            return TemperaturePipe.formatTemperature(value, this.config.temperature_unit, true) as string;
+                        }
+                    }
+                },
+                xaxis: {
+                    type: 'datetime'
                 }
-            },
-            xaxis: {
-                type: 'datetime'
-            }
-        };
+            };
+        }
     }
 
     // -----------------------------------------------------------------------------------------------------
     // @ Public methods
     // -----------------------------------------------------------------------------------------------------
+
+    getProtocolKeys(): string[] {
+        return Object.keys(this.temperatureOptionsByProtocol).sort();
+    }
 
     deviceSummariesForHostGroup(hostGroupWWNs: string[]): DeviceSummaryModel[] {
         const deviceSummaries: DeviceSummaryModel[] = []
@@ -289,8 +304,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
                     this.summaryData[wwn].temp_history = tempHistoryData[wwn] || []
                 }
 
-                // Prepare the chart series data
-                this.tempChart.updateSeries(this._deviceDataTemperatureSeries())
+                // Prepare the chart series data for all protocols
+                this._prepareChartData()
             });
     }
 

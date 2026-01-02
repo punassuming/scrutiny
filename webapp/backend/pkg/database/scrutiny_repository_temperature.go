@@ -30,6 +30,7 @@ func (sr *scrutinyRepository) SaveSmartTemperature(ctx context.Context, wwn stri
 
 			tags, fields := smartTemp.Flatten()
 			tags["device_wwn"] = wwn
+			tags["device_protocol"] = deviceProtocol
 			p := influxdb2.NewPoint("temp",
 				tags,
 				fields,
@@ -49,6 +50,7 @@ func (sr *scrutinyRepository) SaveSmartTemperature(ctx context.Context, wwn stri
 
 		tags, fields := smartTemp.Flatten()
 		tags["device_wwn"] = wwn
+		tags["device_protocol"] = deviceProtocol
 		p := influxdb2.NewPoint("temp",
 			tags,
 			fields,
@@ -111,18 +113,18 @@ func (sr *scrutinyRepository) aggregateTempQuery(durationKey string) string {
 		  |> range(start: -1w, stop: now())
 		  |> filter(fn: (r) => r["_measurement"] == "temp" )
 		  |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)
-		  |> group(columns: ["device_wwn"])
+		  |> group(columns: ["device_wwn", "device_protocol"])
 		  |> toInt()
 
 		monthData = from(bucket: "metrics_weekly")
 		  |> range(start: -1mo, stop: now())
 		  |> filter(fn: (r) => r["_measurement"] == "temp" )
 		  |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)
-		  |> group(columns: ["device_wwn"])
+		  |> group(columns: ["device_wwn", "device_protocol"])
 		  |> toInt()
 
 		union(tables: [weekData, monthData])
-		  |> group(columns: ["device_wwn"])
+		  |> group(columns: ["device_wwn", "device_protocol"])
 		  |> sort(columns: ["_time"], desc: false)
 		  |> schema.fieldsAsCols()
 
@@ -145,7 +147,7 @@ func (sr *scrutinyRepository) aggregateTempQuery(durationKey string) string {
 			fmt.Sprintf(`|> range(start: %s, stop: %s)`, durationRange[0], durationRange[1]),
 			`|> filter(fn: (r) => r["_measurement"] == "temp" )`,
 			`|> aggregateWindow(every: 1h, fn: mean, createEmpty: false)`,
-			`|> group(columns: ["device_wwn"])`,
+			`|> group(columns: ["device_wwn", "device_protocol"])`,
 			`|> toInt()`,
 			"",
 		}...)
@@ -161,7 +163,7 @@ func (sr *scrutinyRepository) aggregateTempQuery(durationKey string) string {
 	} else {
 		partialQueryStr = append(partialQueryStr, []string{
 			fmt.Sprintf("union(tables: [%s])", strings.Join(subQueryNames, ", ")),
-			`|> group(columns: ["device_wwn"])`,
+			`|> group(columns: ["device_wwn", "device_protocol"])`,
 			`|> sort(columns: ["_time"], desc: false)`,
 			"|> schema.fieldsAsCols()",
 		}...)
