@@ -17,6 +17,7 @@ import {SmartModel} from 'app/core/models/measurements/smart-model';
 import {SmartAttributeModel} from 'app/core/models/measurements/smart-attribute-model';
 import {AttributeMetadataModel} from 'app/core/models/thresholds/attribute-metadata-model';
 import {DeviceStatusPipe} from 'app/shared/device-status.pipe';
+import {downloadJson, sanitizeFilenamePart} from 'app/shared/download-json.util';
 
 // from Constants.go - these must match
 const AttributeStatusPassed = 0
@@ -450,19 +451,10 @@ export class DetailComponent implements OnInit, AfterViewInit, OnDestroy {
             metadata: this.metadata
         };
 
-        const fileName = `scrutiny-device-${this.device.wwn || 'export'}.json`;
-        this.downloadJsonFile(exportPayload, fileName);
-    }
-
-    private downloadJsonFile(data: any, fileName: string): void {
-        const jsonContent = JSON.stringify(data, null, 2);
-        const blob = new Blob([jsonContent], {type: 'application/json'});
-        const url = window.URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = fileName;
-        anchor.click();
-        window.URL.revokeObjectURL(url);
+        const fallbackId = this.device.wwn || this.device.serial_number || `device-${Date.now()}`;
+        const safeId = sanitizeFilenamePart(String(fallbackId));
+        const fileName = `scrutiny-device-${safeId}.json`;
+        downloadJson(exportPayload, fileName);
     }
 
     openDialog(): void {

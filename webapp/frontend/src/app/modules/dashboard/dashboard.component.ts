@@ -19,6 +19,7 @@ import {Router} from '@angular/router';
 import {TemperaturePipe} from 'app/shared/temperature.pipe';
 import {DeviceTitlePipe} from 'app/shared/device-title.pipe';
 import {DeviceSummaryModel} from 'app/core/models/device-summary-model';
+import {downloadJson} from 'app/shared/download-json.util';
 
 @Component({
     selector       : 'example',
@@ -298,18 +299,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
             return;
         }
 
-        this.downloadJsonFile(this.summaryData, 'scrutiny-dashboard-summary.json');
-    }
-
-    private downloadJsonFile(data: any, fileName: string): void {
-        const content = JSON.stringify(data, null, 2);
-        const blob = new Blob([content], {type: 'application/json'});
-        const url = window.URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = fileName;
-        anchor.click();
-        window.URL.revokeObjectURL(url);
+        downloadJson(this.summaryData, 'scrutiny-dashboard-summary.json');
     }
 
     /**
