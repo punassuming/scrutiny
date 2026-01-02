@@ -32,13 +32,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
     summaryData: { [key: string]: DeviceSummaryModel };
     hostGroups: { [hostId: string]: string[] } = {}
     temperatureOptions: ApexOptions;
+    healthOptions: ApexOptions;
+    statusOptions: ApexOptions;
     tempDurationKey = 'forever'
+    healthDurationKey = 'forever'
     config: AppConfig;
     showArchived: boolean;
 
     // Private
     private _unsubscribeAll: Subject<void>;
     @ViewChild('tempChart', { static: false }) tempChart: ChartComponent;
+    @ViewChild('healthChart', { static: false }) healthChart: ChartComponent;
+    @ViewChild('statusChart', { static: false }) statusChart: ChartComponent;
 
     /**
      * Constructor
@@ -178,6 +183,71 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
         }
         return deviceTemperatureSeries
     }
+
+    private _deviceDataHealthSeries(): any[] {
+        const deviceHealthSeries = []
+
+        for (const wwn in this.summaryData) {
+            const deviceSummary = this.summaryData[wwn]
+            if (!deviceSummary.health_history || deviceSummary.health_history.length === 0) {
+                continue
+            }
+
+            const deviceName = DeviceTitlePipe.deviceTitleWithFallback(deviceSummary.device, this.config.dashboard_display)
+            const deviceSeriesMetadata = {
+                name: deviceName,
+                data: []
+            }
+
+            for (const healthHistory of deviceSummary.health_history) {
+                const newDate = new Date(healthHistory.date);
+                deviceSeriesMetadata.data.push({
+                    x: newDate,
+                    y: healthHistory.health_estimate
+                })
+            }
+            deviceHealthSeries.push(deviceSeriesMetadata)
+        }
+        return deviceHealthSeries
+    }
+
+    private _deviceStatusSeries(): { series: any[], categories: string[] } {
+        const categories = []
+        const warnCounts = []
+        const failCounts = []
+        const passCounts = []
+
+        for (const wwn in this.summaryData) {
+            const deviceSummary = this.summaryData[wwn]
+            const deviceName = DeviceTitlePipe.deviceTitleWithFallback(deviceSummary.device, this.config.dashboard_display)
+            categories.push(deviceName)
+            const warn = deviceSummary.smart?.warn_count || 0
+            const fail = deviceSummary.smart?.fail_count || 0
+            const total = deviceSummary.smart?.attr_count || warn + fail
+            const passed = Math.max(total - warn - fail, 0)
+            warnCounts.push(warn)
+            failCounts.push(fail)
+            passCounts.push(passed)
+        }
+
+        return {
+            categories,
+            series: [
+                {
+                    name: 'Critical',
+                    data: failCounts
+                },
+                {
+                    name: 'Warn',
+                    data: warnCounts
+                },
+                {
+                    name: 'Passed',
+                    data: passCounts
+                }
+            ]
+        }
+    }
     /**
      * Prepare the chart data from the data
      *
@@ -230,6 +300,87 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
             },
             xaxis: {
                 type: 'datetime'
+            }
+        };
+
+        this.healthOptions = {
+            chart  : {
+                animations: {
+                    speed           : 400,
+                    animateGradually: {
+                        enabled: false
+                    }
+                },
+                fontFamily: 'inherit',
+                foreColor : 'inherit',
+                width     : '100%',
+                height    : '100%',
+                type      : 'area',
+                sparkline : {
+                    enabled: true
+                }
+            },
+            colors : ['#34d399', '#60a5fa', '#fbbf24', '#f87171'],
+            fill   : {
+                colors : ['#bbf7d0', '#bfdbfe', '#fde68a', '#fecdd3'],
+                opacity: 0.5,
+                type   : 'gradient'
+            },
+            series : this._deviceDataHealthSeries(),
+            stroke : {
+                curve: this.config.line_stroke,
+                width: 2
+            },
+            tooltip: {
+                theme: 'dark',
+                shared: true,
+                intersect: false,
+                x    : {
+                    format: 'MMM dd, yyyy HH:mm:ss'
+                },
+                y    : {
+                    formatter: (value) => {
+                        return `${value.toFixed(0)}%`;
+                    }
+                }
+            },
+            yaxis: {
+                max: 100,
+                min: 0
+            },
+            xaxis: {
+                type: 'datetime'
+            }
+        };
+
+        const statusSeries = this._deviceStatusSeries();
+        this.statusOptions = {
+            chart: {
+                type: 'bar',
+                stacked: true,
+                height: 350,
+                toolbar: {
+                    show: false
+                },
+                foreColor: 'inherit',
+                fontFamily: 'inherit'
+            },
+            plotOptions: {
+                bar: {
+                    horizontal: false,
+                    columnWidth: '60%'
+                }
+            },
+            dataLabels: {
+                enabled: false
+            },
+            series: statusSeries.series,
+            xaxis: {
+                categories: statusSeries.categories
+            },
+            colors: ['#f87171', '#fbbf24', '#34d399'],
+            legend: {
+                position: 'top'
             }
         };
     }
@@ -290,6 +441,22 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
 
                 // Prepare the chart series data
                 this.tempChart.updateSeries(this._deviceDataTemperatureSeries())
+            });
+    }
+
+    changeSummaryHealthDuration(durationKey: string): void {
+        this.healthDurationKey = durationKey
+
+        this._dashboardService.getSummaryHealthData(durationKey)
+            .subscribe((healthHistoryData) => {
+
+                for (const wwn in this.summaryData) {
+                    this.summaryData[wwn].health_history = healthHistoryData[wwn] || []
+                }
+
+                if (this.healthChart) {
+                    this.healthChart.updateSeries(this._deviceDataHealthSeries())
+                }
             });
     }
 

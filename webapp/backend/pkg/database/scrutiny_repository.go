@@ -238,7 +238,7 @@ func InfluxSetupComplete(influxEndpoint string, tlsConfig *tls.Config) (bool, er
 		return false, err
 	}
 
-    client := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
 	res, err := client.Get(influxUri.String())
 	if err != nil {
 		return false, err
@@ -352,7 +352,7 @@ func (sr *scrutinyRepository) GetSummary(ctx context.Context) (map[string]*model
 	dailyData = from(bucket: bucketBaseName)
 	|> range(start: -10y, stop: now())
 	|> filter(fn: (r) => r["_measurement"] == "smart" )
-	|> filter(fn: (r) => r["_field"] == "temp" or r["_field"] == "power_on_hours" or r["_field"] == "date")
+	|> filter(fn: (r) => r["_field"] == "temp" or r["_field"] == "power_on_hours" or r["_field"] == "date" or r["_field"] == "health_estimate" or r["_field"] == "attr_warn_count" or r["_field"] == "attr_failed_count" or r["_field"] == "attr_count")
 	|> last()
 	|> schema.fieldsAsCols()
 	|> group(columns: ["device_wwn"])
@@ -360,7 +360,7 @@ func (sr *scrutinyRepository) GetSummary(ctx context.Context) (map[string]*model
 	weeklyData = from(bucket: bucketBaseName + "_weekly")
 	|> range(start: -10y, stop: now())
 	|> filter(fn: (r) => r["_measurement"] == "smart" )
-	|> filter(fn: (r) => r["_field"] == "temp" or r["_field"] == "power_on_hours" or r["_field"] == "date")
+	|> filter(fn: (r) => r["_field"] == "temp" or r["_field"] == "power_on_hours" or r["_field"] == "date" or r["_field"] == "health_estimate" or r["_field"] == "attr_warn_count" or r["_field"] == "attr_failed_count" or r["_field"] == "attr_count")
 	|> last()
 	|> schema.fieldsAsCols()
 	|> group(columns: ["device_wwn"])
@@ -368,7 +368,7 @@ func (sr *scrutinyRepository) GetSummary(ctx context.Context) (map[string]*model
 	monthlyData = from(bucket: bucketBaseName + "_monthly")
 	|> range(start: -10y, stop: now())
 	|> filter(fn: (r) => r["_measurement"] == "smart" )
-	|> filter(fn: (r) => r["_field"] == "temp" or r["_field"] == "power_on_hours" or r["_field"] == "date")
+	|> filter(fn: (r) => r["_field"] == "temp" or r["_field"] == "power_on_hours" or r["_field"] == "date" or r["_field"] == "health_estimate" or r["_field"] == "attr_warn_count" or r["_field"] == "attr_failed_count" or r["_field"] == "attr_count")
 	|> last()
 	|> schema.fieldsAsCols()
 	|> group(columns: ["device_wwn"])
@@ -376,7 +376,7 @@ func (sr *scrutinyRepository) GetSummary(ctx context.Context) (map[string]*model
 	yearlyData = from(bucket: bucketBaseName + "_yearly")
 	|> range(start: -10y, stop: now())
 	|> filter(fn: (r) => r["_measurement"] == "smart" )
-	|> filter(fn: (r) => r["_field"] == "temp" or r["_field"] == "power_on_hours" or r["_field"] == "date")
+	|> filter(fn: (r) => r["_field"] == "temp" or r["_field"] == "power_on_hours" or r["_field"] == "date" or r["_field"] == "health_estimate" or r["_field"] == "attr_warn_count" or r["_field"] == "attr_failed_count" or r["_field"] == "attr_count")
 	|> last()
 	|> schema.fieldsAsCols()
 	|> group(columns: ["device_wwn"])
@@ -409,11 +409,28 @@ func (sr *scrutinyRepository) GetSummary(ctx context.Context) (map[string]*model
 					summaries[deviceWWN.(string)] = &models.DeviceSummary{}
 				}
 
-				summaries[deviceWWN.(string)].SmartResults = &models.SmartSummary{
-					Temp:          result.Record().Values()["temp"].(int64),
-					PowerOnHours:  result.Record().Values()["power_on_hours"].(int64),
+				summary := &models.SmartSummary{
 					CollectorDate: result.Record().Values()["_time"].(time.Time),
 				}
+				if tempVal, ok := result.Record().Values()["temp"]; ok {
+					summary.Temp = tempVal.(int64)
+				}
+				if poh, ok := result.Record().Values()["power_on_hours"]; ok {
+					summary.PowerOnHours = poh.(int64)
+				}
+				if he, ok := result.Record().Values()["health_estimate"]; ok {
+					summary.HealthEstimate = he.(float64)
+				}
+				if wc, ok := result.Record().Values()["attr_warn_count"]; ok {
+					summary.WarnCount = wc.(int64)
+				}
+				if fc, ok := result.Record().Values()["attr_failed_count"]; ok {
+					summary.FailCount = fc.(int64)
+				}
+				if ac, ok := result.Record().Values()["attr_count"]; ok {
+					summary.AttrCount = ac.(int64)
+				}
+				summaries[deviceWWN.(string)].SmartResults = summary
 			}
 		}
 		if result.Err() != nil {
@@ -434,6 +451,14 @@ func (sr *scrutinyRepository) GetSummary(ctx context.Context) (map[string]*model
 	}
 	for wwn, tempHistory := range deviceTempHistory {
 		summaries[wwn].TempHistory = tempHistory
+	}
+
+	deviceHealthHistory, err := sr.GetSmartHealthHistory(ctx, DURATION_KEY_FOREVER)
+	if err != nil {
+		sr.logger.Printf("Error retrieving health history: %v", err)
+	}
+	for wwn, healthHistory := range deviceHealthHistory {
+		summaries[wwn].HealthHistory = healthHistory
 	}
 
 	return summaries, nil

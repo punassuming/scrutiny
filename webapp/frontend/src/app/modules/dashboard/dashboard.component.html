@@ -114,6 +114,69 @@
                 </div>
             </div>
 
+            <!-- Health Trend -->
+            <div class="flex flex-auto w-full min-w-80 h-90 p-4">
+                <div class="flex flex-col flex-auto bg-card shadow-md rounded overflow-hidden">
+                    <div class="flex flex-col p-6 pr-4 pb-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex flex-col">
+                                <div class="font-bold text-md text-secondary uppercase tracking-wider mr-4">Health</div>
+                                <div class="text-sm text-hint font-medium">Health estimate history for each device</div>
+                            </div>
+                            <div>
+                                <button class="h-8 min-h-8 px-2"
+                                        mat-button
+                                        [matMenuTriggerFor]="healthRangeMenu">
+                                    <span class="font-medium text-sm text-hint">{{ healthDurationKey }}</span>
+                                </button>
+                                <mat-menu #healthRangeMenu="matMenu">
+                                    <button (click)="changeSummaryHealthDuration('forever')" mat-menu-item>forever</button>
+                                    <button (click)="changeSummaryHealthDuration('year')" mat-menu-item>year</button>
+                                    <button (click)="changeSummaryHealthDuration('month')" mat-menu-item>month</button>
+                                    <button (click)="changeSummaryHealthDuration('week')" mat-menu-item>week</button>
+                                </mat-menu>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="flex flex-col flex-auto">
+                        <apx-chart #healthChart *ngIf="healthOptions" class="flex-auto w-full h-full"
+                                   [chart]="healthOptions.chart"
+                                   [colors]="healthOptions.colors"
+                                   [fill]="healthOptions.fill"
+                                   [series]="healthOptions.series"
+                                   [stroke]="healthOptions.stroke"
+                                   [tooltip]="healthOptions.tooltip"
+                                   [xaxis]="healthOptions.xaxis"
+                                   [yaxis]="healthOptions.yaxis"></apx-chart>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Composition -->
+            <div class="flex flex-auto w-full min-w-80 h-90 p-4">
+                <div class="flex flex-col flex-auto bg-card shadow-md rounded overflow-hidden">
+                    <div class="flex flex-col p-6 pr-4 pb-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex flex-col">
+                                <div class="font-bold text-md text-secondary uppercase tracking-wider mr-4">SMART Status Mix</div>
+                                <div class="text-sm text-hint font-medium">Passed vs Warn vs Critical attribute counts</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col flex-auto">
+                        <apx-chart #statusChart *ngIf="statusOptions" class="flex-auto w-full h-full"
+                                   [chart]="statusOptions.chart"
+                                   [plotOptions]="statusOptions.plotOptions"
+                                   [dataLabels]="statusOptions.dataLabels"
+                                   [series]="statusOptions.series"
+                                   [xaxis]="statusOptions.xaxis"
+                                   [colors]="statusOptions.colors"
+                                   [legend]="statusOptions.legend"></apx-chart>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
     </div>

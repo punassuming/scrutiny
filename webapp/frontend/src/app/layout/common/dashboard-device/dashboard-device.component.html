@@ -63,6 +63,20 @@
             <ng-template #unknownStatus><div class="mt-2 font-medium text-3xl leading-none">No Data</div></ng-template>
         </div>
         <div class="flex flex-col mx-6 my-3 xs:w-full">
+            <div class="font-semibold text-xs text-hint uppercase tracking-wider leading-none">Health</div>
+            <div class="mt-2 font-medium text-3xl leading-none"
+                 *ngIf="deviceSummary.smart?.collector_date; else unknownHealth">{{ deviceSummary.smart?.health_estimate | number:'1.0-0' }}%</div>
+            <ng-template #unknownHealth><div class="mt-2 font-medium text-3xl leading-none">--</div></ng-template>
+        </div>
+        <div class="flex flex-col mx-6 my-3 xs:w-full">
+            <div class="font-semibold text-xs text-hint uppercase tracking-wider leading-none">Alerts</div>
+            <div class="mt-2 font-medium text-lg leading-none" *ngIf="deviceSummary.smart; else unknownAlerts">
+                <span class="text-yellow font-semibold">{{ deviceSummary.smart?.warn_count || 0 }} Warn</span>
+                <span class="ml-3 text-red font-semibold">{{ deviceSummary.smart?.fail_count || 0 }} Critical</span>
+            </div>
+            <ng-template #unknownAlerts><div class="mt-2 font-medium text-lg leading-none">--</div></ng-template>
+        </div>
+        <div class="flex flex-col mx-6 my-3 xs:w-full">
             <div class="font-semibold text-xs text-hint uppercase tracking-wider leading-none">Temperature</div>
             <div class="mt-2 font-medium text-3xl leading-none"
                  *ngIf="deviceSummary.smart?.collector_date; else unknownTemp">{{ deviceSummary.smart?.temp | temperature:config.temperature_unit:true }}</div>

@@ -22,6 +22,9 @@ type Smart struct {
 	Temp            int64 `json:"temp"`
 	PowerOnHours    int64 `json:"power_on_hours"`
 	PowerCycleCount int64 `json:"power_cycle_count"`
+	WarnCount       int64 `json:"attr_warn_count"`
+	FailCount       int64 `json:"attr_failed_count"`
+	AttrCount       int64 `json:"attr_count"`
 
 	//Attributes (fields)
 	Attributes map[string]SmartAttribute `json:"attrs"`
@@ -37,10 +40,16 @@ func (sm *Smart) Flatten() (tags map[string]string, fields map[string]interface{
 		"device_protocol": sm.DeviceProtocol,
 	}
 
+	if sm.AttrCount == 0 {
+		sm.AttrCount = int64(len(sm.Attributes))
+	}
 	fields = map[string]interface{}{
 		"temp":              sm.Temp,
 		"power_on_hours":    sm.PowerOnHours,
 		"power_cycle_count": sm.PowerCycleCount,
+		"attr_warn_count":   sm.WarnCount,
+		"attr_failed_count": sm.FailCount,
+		"attr_count":        sm.AttrCount,
 		"health_estimate":   sm.HealthEstimate,
 	}
 
@@ -73,6 +82,12 @@ func NewSmartFromInfluxDB(attrs map[string]interface{}) (*Smart, error) {
 			sm.PowerOnHours = val.(int64)
 		case "power_cycle_count":
 			sm.PowerCycleCount = val.(int64)
+		case "attr_warn_count":
+			sm.WarnCount = val.(int64)
+		case "attr_failed_count":
+			sm.FailCount = val.(int64)
+		case "attr_count":
+			sm.AttrCount = val.(int64)
 		case "health_estimate":
 			sm.HealthEstimate = val.(float64)
 		default:
@@ -196,31 +211,41 @@ func (sm *Smart) ProcessNvmeSmartInfo(nvmeSmartHealthInformationLog collector.Nv
 // CalculateHealthEstimate computes a disk health estimate based on SMART attributes.
 // The estimate is stored on the Smart struct and returned as a percentage between 0-100.
 func (sm *Smart) CalculateHealthEstimate() float64 {
-	if len(sm.Attributes) == 0 {
+	attrCount := len(sm.Attributes)
+	sm.AttrCount = int64(attrCount)
+	sm.WarnCount = 0
+	sm.FailCount = 0
+
+	if attrCount == 0 {
 		sm.HealthEstimate = 100
 		return sm.HealthEstimate
 	}
 
 	totalHealth := 0.0
 	for _, attr := range sm.Attributes {
-		risk := sm.attributeRisk(attr)
+		risk, status := sm.attributeRisk(attr)
+		if pkg.AttributeStatusHas(status, pkg.AttributeStatusFailedSmart|pkg.AttributeStatusFailedScrutiny) {
+			sm.FailCount++
+		} else if pkg.AttributeStatusHas(status, pkg.AttributeStatusWarningScrutiny) {
+			sm.WarnCount++
+		}
 		totalHealth += 1 - risk
 	}
 
-	sm.HealthEstimate = clamp01(totalHealth/float64(len(sm.Attributes))) * 100
+	sm.HealthEstimate = clamp01(totalHealth/float64(attrCount)) * 100
 	return sm.HealthEstimate
 }
 
-func (sm *Smart) attributeRisk(attr SmartAttribute) float64 {
+func (sm *Smart) attributeRisk(attr SmartAttribute) (float64, pkg.AttributeStatus) {
 	switch v := attr.(type) {
 	case *SmartAtaAttribute:
-		return sm.ataAttributeRisk(v)
+		return sm.ataAttributeRisk(v), v.Status
 	case *SmartNvmeAttribute:
-		return sm.nvmeAttributeRisk(v)
+		return sm.nvmeAttributeRisk(v), v.Status
 	case *SmartScsiAttribute:
-		return sm.scsiAttributeRisk(v)
+		return sm.scsiAttributeRisk(v), v.Status
 	default:
-		return 0
+		return 0, 0
 	}
 }
 

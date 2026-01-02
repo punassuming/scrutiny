@@ -31,7 +31,7 @@ func TestSmart_Flatten(t *testing.T) {
 
 	//assert
 	require.Equal(t, map[string]string{"device_protocol": "ATA", "device_wwn": "test-wwn"}, tags)
-	require.Equal(t, map[string]interface{}{"health_estimate": float64(0), "power_cycle_count": int64(10), "power_on_hours": int64(10), "temp": int64(50)}, fields)
+	require.Equal(t, map[string]interface{}{"attr_count": int64(0), "attr_failed_count": int64(0), "attr_warn_count": int64(0), "health_estimate": float64(0), "power_cycle_count": int64(10), "power_on_hours": int64(10), "temp": int64(50)}, fields)
 }
 
 func TestSmart_Flatten_ATA(t *testing.T) {
@@ -97,6 +97,9 @@ func TestSmart_Flatten_ATA(t *testing.T) {
 		"attr.2.when_failed":       "",
 		"attr.2.worst":             int64(135),
 
+		"attr_count":        int64(2),
+		"attr_failed_count": int64(0),
+		"attr_warn_count":   int64(0),
 		"health_estimate":   float64(0),
 		"power_cycle_count": int64(10),
 		"power_on_hours":    int64(10),
@@ -136,6 +139,9 @@ func TestSmart_Flatten_SCSI(t *testing.T) {
 		"attr.read_errors_corrected_by_eccfast.thresh":            int64(0),
 		"attr.read_errors_corrected_by_eccfast.transformed_value": int64(0),
 		"attr.read_errors_corrected_by_eccfast.value":             int64(300357663),
+		"attr_count":        int64(1),
+		"attr_failed_count": int64(0),
+		"attr_warn_count":   int64(0),
 		"health_estimate":   float64(0),
 		"power_cycle_count": int64(10),
 		"power_on_hours":    int64(10),
@@ -175,6 +181,9 @@ func TestSmart_Flatten_NVMe(t *testing.T) {
 		"attr.available_spare.thresh":            int64(0),
 		"attr.available_spare.transformed_value": int64(0),
 		"attr.available_spare.value":             int64(100),
+		"attr_count":                             int64(1),
+		"attr_failed_count":                      int64(0),
+		"attr_warn_count":                        int64(0),
 		"health_estimate":                        float64(0),
 		"power_cycle_count":                      int64(10),
 		"power_on_hours":                         int64(10),
@@ -216,6 +225,9 @@ func TestNewSmartFromInfluxDB_ATA(t *testing.T) {
 		Temp:            50,
 		PowerOnHours:    10,
 		PowerCycleCount: 10,
+		WarnCount:       0,
+		FailCount:       0,
+		AttrCount:       1,
 		Attributes: map[string]measurements.SmartAttribute{
 			"1": &measurements.SmartAtaAttribute{
 				AttributeId: 1,
@@ -260,6 +272,9 @@ func TestNewSmartFromInfluxDB_NVMe(t *testing.T) {
 		Temp:            50,
 		PowerOnHours:    10,
 		PowerCycleCount: 10,
+		WarnCount:       0,
+		FailCount:       0,
+		AttrCount:       1,
 		Attributes: map[string]measurements.SmartAttribute{
 			"available_spare": &measurements.SmartNvmeAttribute{
 				AttributeId: "available_spare",
@@ -299,6 +314,9 @@ func TestNewSmartFromInfluxDB_SCSI(t *testing.T) {
 		Temp:            50,
 		PowerOnHours:    10,
 		PowerCycleCount: 10,
+		WarnCount:       0,
+		FailCount:       0,
+		AttrCount:       1,
 		Attributes: map[string]measurements.SmartAttribute{
 			"read_errors_corrected_by_eccfast": &measurements.SmartScsiAttribute{
 				AttributeId: "read_errors_corrected_by_eccfast",
@@ -531,5 +549,8 @@ func TestSmartCalculateHealthEstimate(t *testing.T) {
 	health := smart.CalculateHealthEstimate()
 
 	require.InDelta(t, 77.38, health, 0.2)
+	require.Equal(t, int64(2), smart.AttrCount)
+	require.Equal(t, int64(0), smart.FailCount)
+	require.Equal(t, int64(0), smart.WarnCount)
 	require.Equal(t, health, smart.HealthEstimate)
 }

@@ -7,6 +7,8 @@ import {DeviceSummaryResponseWrapper} from 'app/core/models/device-summary-respo
 import {DeviceSummaryModel} from 'app/core/models/device-summary-model';
 import {SmartTemperatureModel} from 'app/core/models/measurements/smart-temperature-model';
 import {DeviceSummaryTempResponseWrapper} from 'app/core/models/device-summary-temp-response-wrapper';
+import {DeviceSummaryHealthResponseWrapper} from 'app/core/models/device-summary-health-response-wrapper';
+import {SmartHealthModel} from 'app/core/models/measurements/smart-health-model';
 
 @Injectable({
     providedIn: 'root'
@@ -68,6 +70,17 @@ export class DashboardService {
             map((response: DeviceSummaryTempResponseWrapper) => {
                 return response.data.temp_history
             })
+        );
+    }
+
+    getSummaryHealthData(durationKey: string): Observable<{ [key: string]: SmartHealthModel[] }> {
+        const params = {}
+        if (durationKey) {
+            params['duration_key'] = durationKey
+        }
+
+        return this._httpClient.get(getBasePath() + '/api/summary/health', {params}).pipe(
+            map((response: DeviceSummaryHealthResponseWrapper) => response.data.health_history)
         );
     }
 }

@@ -140,6 +140,21 @@ func (mr *MockDeviceRepoMockRecorder) GetSmartTemperatureHistory(ctx, durationKe
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSmartTemperatureHistory", reflect.TypeOf((*MockDeviceRepo)(nil).GetSmartTemperatureHistory), ctx, durationKey)
 }
 
+// GetSmartHealthHistory mocks base method.
+func (m *MockDeviceRepo) GetSmartHealthHistory(ctx context.Context, durationKey string) (map[string][]measurements.SmartHealth, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSmartHealthHistory", ctx, durationKey)
+	ret0, _ := ret[0].(map[string][]measurements.SmartHealth)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSmartHealthHistory indicates an expected call of GetSmartHealthHistory.
+func (mr *MockDeviceRepoMockRecorder) GetSmartHealthHistory(ctx, durationKey interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSmartHealthHistory", reflect.TypeOf((*MockDeviceRepo)(nil).GetSmartHealthHistory), ctx, durationKey)
+}
+
 // GetSummary mocks base method.
 func (m *MockDeviceRepo) GetSummary(ctx context.Context) (map[string]*models.DeviceSummary, error) {
 	m.ctrl.T.Helper()
