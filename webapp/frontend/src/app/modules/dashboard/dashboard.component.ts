@@ -4,12 +4,11 @@ import {
     Component,
     OnDestroy,
     OnInit,
-    ViewChild,
     ViewEncapsulation
 } from '@angular/core';
 import {Subject} from 'rxjs';
 import {takeUntil} from 'rxjs/operators';
-import {ApexOptions, ChartComponent} from 'ng-apexcharts';
+import {ApexOptions} from 'ng-apexcharts';
 import {DashboardService} from 'app/modules/dashboard/dashboard.service';
 import {MatDialog} from '@angular/material/dialog';
 import {DashboardSettingsComponent} from 'app/layout/common/dashboard-settings/dashboard-settings.component';
@@ -39,7 +38,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy
 
     // Private
     private _unsubscribeAll: Subject<void>;
-    @ViewChild('tempChart', { static: false }) tempChart: ChartComponent;
 
     /**
      * Constructor
